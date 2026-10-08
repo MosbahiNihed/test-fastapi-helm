@@ -1,0 +1,6 @@
+apiVersion: v2                 # Helm 3 chart format
+name: test-fastapi            # chart name (keep it equal to the folder name)
+description: Stateless FastAPI service
+type: application
+version: 0.1.0                 # version of the CHART - bump when you change templates
+appVersion: "0.1.0"            # version of your APP (informational only)

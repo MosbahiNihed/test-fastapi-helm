@@ -1,0 +1,28 @@
+# Shared defaults for ALL environments.
+# Per-environment overrides go in values-<env>.yaml (e.g. values-dev.yaml).
+
+replicaCount: 2
+
+image:
+  repository: kind-registry:5000/test-fastapi   # how the cluster reaches the local registry
+  tag: "v1"                                      # fallback; each env sets its own tag
+  pullPolicy: IfNotPresent
+
+containerPort: 8000      # port your app listens on (Dockerfile CMD)
+healthPath: /healthz     # used by readiness/liveness probes ("/" if no /healthz)
+
+# Environment variables passed to the app (KEY: value)
+env:
+  ENVIRONMENT: default
+  LOG_LEVEL: info
+
+service:
+  type: ClusterIP        # internal only; reach it with port-forward or a Gateway
+  port: 80               # Service port -> forwards to containerPort
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

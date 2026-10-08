@@ -1,0 +1,17 @@
+# Dev environment overrides (merged on top of values.yaml).
+# Tekton updates image.tag here - keep it the only "tag:" line in this file.
+replicaCount: 1
+
+image:
+  tag: "v1"
+
+env:
+  ENVIRONMENT: dev
+  LOG_LEVEL: debug
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

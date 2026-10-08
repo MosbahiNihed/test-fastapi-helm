@@ -16,6 +16,36 @@ spec:
       labels:
         app: {{ .Release.Name }}
     spec:
+      {{- with .Values.liquibase }}
+      {{- if .enabled }}
+      # Migrations run before the app: wait for PostgreSQL, then liquibase update.
+      initContainers:
+        - name: wait-for-db
+          image: {{ .waitImage | quote }}
+          command:
+            - sh
+            - -c
+            - until pg_isready -h {{ .DB_HOST }} -p {{ .DB_PORT }}; do echo "waiting for database"; sleep 2; done
+        - name: liquibase
+          image: {{ include "test-fastapi.liquibaseImage" $ | quote }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args: ["update"]
+          env:
+            - name: LIQUIBASE_COMMAND_URL
+              value: "jdbc:postgresql://{{ .DB_HOST }}:{{ .DB_PORT }}/{{ .DB_NAME }}"
+            - name: LIQUIBASE_COMMAND_USERNAME
+              value: {{ .DB_USER | quote }}
+            - name: LIQUIBASE_COMMAND_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .passwordSecret.name }}
+                  key: {{ .passwordSecret.key }}
+            - name: LIQUIBASE_COMMAND_CONTEXTS
+              value: {{ .contexts | quote }}
+          resources:
+            {{- toYaml .resources | nindent 12 }}
+      {{- end }}
+      {{- end }}
       containers:
         - name: api
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -26,18 +56,15 @@ spec:
           env:
             - name: APP_VERSION
               value: {{ .Values.image.tag | quote }}
-            {{- range $key, $value := .Values.env }}
-            - name: {{ $key }}
-              value: {{ $value | quote }}
-            {{- end }}
+            {{- include "test-fastapi.env" . | trim | nindent 12 }}
           readinessProbe:
             httpGet:
-              path: {{ .Values.healthPath }}
+              path: {{ .Values.readinessPath }}
               port: http
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: {{ .Values.healthPath }}
+              path: {{ .Values.livenessPath }}
               port: http
             initialDelaySeconds: 10
             periodSeconds: 20

@@ -9,12 +9,36 @@ image:
   pullPolicy: IfNotPresent
 
 containerPort: 8000      # port your app listens on (Dockerfile CMD)
-healthPath: /healthz     # used by readiness/liveness probes ("/" if no /healthz)
+livenessPath: /healthz   # process is alive (no DB check)
+readinessPath: /readyz   # ready only when the database is reachable
 
-# Environment variables passed to the app (KEY: value)
+# Environment variables passed to the app AND the migrations Job.
+# List of {name, value} (valueFrom also works). Helm REPLACES lists instead of
+# merging them, so a values-<env>.yaml that sets env must repeat the full list.
+# PostgreSQL itself is deployed by the separate chart test-fastapi-postgresql-helm.
 env:
-  ENVIRONMENT: default
-  LOG_LEVEL: info
+  - name: ENVIRONMENT
+    value: default
+  - name: LOG_LEVEL
+    value: info
+  - name: DB_HOST
+    value: test-fastapi-postgresql      # Service of the PostgreSQL release
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_NAME
+    value: app
+  # Credentials from the Secret created by hand (never in Git), shared with
+  # the PostgreSQL chart.
+  - name: DB_USER
+    valueFrom:
+      secretKeyRef:
+        name: test-fastapi-db
+        key: DB_USER
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: test-fastapi-db
+        key: DB_PASSWORD
 
 service:
   type: ClusterIP        # internal only; reach it with port-forward or a Gateway
@@ -26,3 +50,26 @@ resources:
     memory: 64Mi
   limits:
     memory: 256Mi
+
+# Liquibase migrations, run as initContainers of the Deployment (before the app
+# starts, in every pod; Liquibase's lock table makes concurrent runs safe).
+# repository: image without a tag -> image.tag is used (Tekton builds both
+# images with the same tag); with a tag (e.g. ":latest") it is used as is.
+liquibase:
+  repository: kind-registry:5000/test-fastapi-liquibase
+  enabled: true
+  DB_HOST: test-fastapi-postgresql
+  DB_PORT: "5432"
+  DB_NAME: app
+  DB_USER: app
+  passwordSecret:                  # Secret created by hand (never in Git)
+    name: test-fastapi-db
+    key: DB_PASSWORD
+  contexts: default                # "dev" also loads the seed users
+  waitImage: postgres:17-alpine    # provides pg_isready for the wait-for-db initContainer
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 512Mi

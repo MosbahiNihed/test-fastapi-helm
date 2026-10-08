@@ -5,9 +5,34 @@ replicaCount: 1
 image:
   tag: "v1"
 
+# Full list (Helm replaces lists, it does not merge them with values.yaml).
 env:
-  ENVIRONMENT: dev
-  LOG_LEVEL: debug
+  - name: ENVIRONMENT
+    value: dev
+  - name: LOG_LEVEL
+    value: debug
+  - name: DB_HOST
+    value: test-fastapi-postgresql
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_NAME
+    value: app
+  # Credentials from the Secret created by hand (never in Git), shared with
+  # the PostgreSQL chart.
+  - name: DB_USER
+    valueFrom:
+      secretKeyRef:
+        name: test-fastapi-db
+        key: DB_USER
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: test-fastapi-db
+        key: DB_PASSWORD
+
+# Merged with liquibase in values.yaml (maps merge, unlike lists).
+liquibase:
+  contexts: dev                    # load the seed users (changeset 002-seed-users)
 
 resources:
   requests:
